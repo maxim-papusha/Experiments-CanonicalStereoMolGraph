@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools >= 70.0.3"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project]
+name = "SI_CanonicalSMG"
+version = "0.1.0"
+description = "Supporting-information code and notebooks for canonical StereoMolGraph enumeration"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Maxim Papusha", email = "maxim.papusha@ltt.rwth-aachen.de" },
+]
+dependencies = [
+    "ipykernel",
+    "ipywidgets",
+    "rdkit",
+    "pandas",
+    "stereomolgraph @ git+https://github.com/maxim-papusha/StereoMolGraph.git@canon",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
