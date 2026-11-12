@@ -17,6 +17,7 @@ import argparse
 import csv
 import json
 import math
+import signal
 import sys
 import time
 import traceback
@@ -94,7 +95,7 @@ def enum_rdkit_count(mol: Chem.Mol):
     return sum(1 for _ in EnumerateStereoisomers(mol, options=opts))
 
 
-def analyze_case(record, mode: str, max_sites: int, max_product: int):
+def analyze_case(record, mode: str, max_sites: int, max_product: int, max_heavy_atoms: int):
     start = time.monotonic()
     result = {
         "id": record["id"],
@@ -109,6 +110,9 @@ def analyze_case(record, mode: str, max_sites: int, max_product: int):
         return result
 
     result["heavy_atoms"] = mol.GetNumHeavyAtoms()
+    if result["heavy_atoms"] > max_heavy_atoms:
+        result["status"] = "skip_too_many_atoms"
+        return result
     if mode == "unassigned":
         Chem.RemoveStereochemistry(mol)
 
@@ -179,7 +183,18 @@ def run(args):
     for r in selected:
         for mode in args.modes:
             try:
-                row = analyze_case(r, mode, args.max_sites, args.max_product)
+                if hasattr(signal, "setitimer"):
+                    signal.setitimer(signal.ITIMER_REAL, args.timeout_per_case)
+                row = analyze_case(
+                    r, mode, args.max_sites, args.max_product, args.max_heavy_atoms
+                )
+            except TimeoutError:
+                row = {
+                    "id": r["id"],
+                    "mode": mode,
+                    "smiles": r["smiles"],
+                    "status": "timeout",
+                }
             except Exception as e:
                 row = {
                     "id": r["id"],
@@ -189,6 +204,9 @@ def run(args):
                     "error": f"{type(e).__name__}: {e}",
                     "traceback": traceback.format_exc(limit=3),
                 }
+            finally:
+                if hasattr(signal, "setitimer"):
+                    signal.setitimer(signal.ITIMER_REAL, 0)
             rows.append(row)
             print(
                 f"{row['id']} {mode:10s} {row['status']:28s} "
@@ -213,6 +231,8 @@ def run(args):
         "filters": {
             "max_sites": args.max_sites,
             "max_product": args.max_product,
+            "max_heavy_atoms": args.max_heavy_atoms,
+            "timeout_per_case": args.timeout_per_case,
             "modes": args.modes,
         },
         "rows": rows,
@@ -240,6 +260,8 @@ if __name__ == "__main__":
     parser.add_argument("--ids", default="")
     parser.add_argument("--max-sites", type=int, default=7)
     parser.add_argument("--max-product", type=int, default=256)
+    parser.add_argument("--max-heavy-atoms", type=int, default=50)
+    parser.add_argument("--timeout-per-case", type=float, default=3.0)
     parser.add_argument(
         "--modes", nargs="+", default=["specified", "unassigned"],
         choices=["specified", "unassigned"]
@@ -247,4 +269,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output", type=Path, default=Path("results/comparison.json")
     )
+    if hasattr(signal, "SIGALRM"):
+        def _timeout(_signum, _frame):
+            raise TimeoutError("per-case time limit")
+        signal.signal(signal.SIGALRM, _timeout)
     sys.exit(run(parser.parse_args()))
