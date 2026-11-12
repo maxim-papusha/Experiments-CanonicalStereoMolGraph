@@ -1,0 +1,51 @@
+name: Tetrahedral-only comparison
+
+on:
+  push:
+    branches: [stereoisomer-comparison]
+  workflow_dispatch:
+
+jobs:
+  compare-tetrahedral:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout CIP molecule dataset and benchmark
+        uses: actions/checkout@v4
+
+      - name: Checkout experimental StereoMolGraph
+        uses: actions/checkout@v4
+        with:
+          repository: maxim-papusha/StereoMolGraph
+          ref: stereoisomer
+          path: _stereomolgraph
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install StereoMolGraph and RDKit
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ./_stereomolgraph
+
+      - name: Run strict tetrahedral comparison on all 300 molecules
+        run: |
+          python benchmarks/compare_tetrahedral_only.py \
+            --dataset data/smiles.txt \
+            --limit 0 \
+            --max-sites 7 \
+            --max-product 128 \
+            --timeout-per-case 3 \
+            --output results/tetrahedral_only.json
+
+      - name: Upload detailed JSON and CSV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tetrahedral-only-results
+          path: |
+            results/tetrahedral_only.json
+            results/tetrahedral_only.csv
+          if-no-files-found: warn
