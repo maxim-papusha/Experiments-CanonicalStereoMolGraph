@@ -1,8 +1,6 @@
 name: Stereo enumeration comparison
 
 on:
-  push:
-    branches: [stereoisomer-comparison]
   workflow_dispatch:
 
 jobs:
