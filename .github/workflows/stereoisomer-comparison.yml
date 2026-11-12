@@ -34,7 +34,7 @@ jobs:
         run: |
           python benchmarks/compare_stereoisomers.py \
             --dataset data/smiles.txt \
-            --limit 70 \
+            --limit 0 \
             --max-sites 7 \
             --max-product 128 \
             --output results/comparison.json
