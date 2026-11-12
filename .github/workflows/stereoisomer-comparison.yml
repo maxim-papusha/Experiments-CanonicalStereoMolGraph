@@ -1,0 +1,48 @@
+name: Stereo enumeration comparison
+
+on:
+  push:
+    branches: [stereoisomer-comparison]
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout benchmark and molecule dataset
+        uses: actions/checkout@v4
+
+      - name: Checkout StereoMolGraph experimental branch
+        uses: actions/checkout@v4
+        with:
+          repository: maxim-papusha/StereoMolGraph
+          ref: stereoisomer
+          path: _stereomolgraph
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install scientific dependencies and StereoMolGraph
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ./_stereomolgraph
+
+      - name: Compare RDKit and StereoMolGraph
+        run: |
+          python benchmarks/compare_stereoisomers.py \
+            --dataset data/smiles.txt \
+            --limit 70 \
+            --max-sites 7 \
+            --max-product 128 \
+            --output results/comparison.json
+
+      - name: Upload full case-by-case report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stereoisomer-comparison
+          path: results/comparison.json
+          if-no-files-found: warn
